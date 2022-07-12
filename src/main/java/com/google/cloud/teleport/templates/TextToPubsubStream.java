@@ -22,7 +22,11 @@ import org.apache.beam.sdk.io.TextIO;
 import org.apache.beam.sdk.io.gcp.pubsub.PubsubIO;
 import org.apache.beam.sdk.options.PipelineOptionsFactory;
 import org.apache.beam.sdk.transforms.Watch;
+import org.apache.beam.sdk.values.PCollection;
 import org.joda.time.Duration;
+
+import java.util.Arrays;
+import java.util.List;
 
 /**
  * The {@code TextToPubsubStream} is a streaming version of {@code TextToPubsub} pipeline that
@@ -40,51 +44,60 @@ import org.joda.time.Duration;
  * --project=${PROJECT_ID} \
  * --stagingLocation=gs://${STAGING_BUCKET}/dataflow/pipelines/${PIPELINE_FOLDER}/staging \
  * --tempLocation=gs://${STAGING_BUCKET}/dataflow/pipelines/${PIPELINE_FOLDER}/temp \
+ * --netwworkdeinemudda=gs://${STAGING_BUCKET}/dataflow/pipelines/${PIPELINE_FOLDER}/temp \
  * --runner=DataflowRunner \
- * --inputFilePattern=gs://path/to/*.csv \
- * --outputTopic=projects/${PROJECT_ID}/topics/${TOPIC_NAME}"
+ * --inputFilePattern=gs://path/to/*.csv"
  * }
  * </pre>
  */
 public class TextToPubsubStream extends TextToPubsub {
-  private static final Duration DEFAULT_POLL_INTERVAL = Duration.standardSeconds(10);
+    private static final Duration DEFAULT_POLL_INTERVAL = Duration.standardSeconds(10);
 
-  /**
-   * Main entry-point for the pipeline. Reads in the command-line arguments, parses them, and
-   * executes the pipeline.
-   *
-   * @param args Arguments passed in from the command-line.
-   */
-  public static void main(String[] args) {
-
-    // Parse the user options passed from the command-line
-    Options options = PipelineOptionsFactory.fromArgs(args).withValidation().as(Options.class);
-
-    run(options);
-  }
-
-  /**
-   * Executes the pipeline with the provided execution parameters.
-   *
-   * @param options The execution parameters.
-   */
-  public static PipelineResult run(Options options) {
-    // Create the pipeline.
-    Pipeline pipeline = Pipeline.create(options);
-
-    /*
-     * Steps:
-     *  1) Read from the text source.
-     *  2) Write each text record to Pub/Sub
+    /**
+     * Main entry-point for the pipeline. Reads in the command-line arguments, parses them, and
+     * executes the pipeline.
+     *
+     * @param args Arguments passed in from the command-line.
      */
-    pipeline
-        .apply(
-            "Read Text Data",
-            TextIO.read()
-                .from(options.getInputFilePattern())
-                .watchForNewFiles(DEFAULT_POLL_INTERVAL, Watch.Growth.never()))
-        .apply("Write to PubSub", PubsubIO.writeStrings().to(options.getOutputTopic()));
+    public static void main(String[] args) {
 
-    return pipeline.run();
-  }
+        // Parse the user options passed from the command-line
+        Options options = PipelineOptionsFactory.fromArgs(args).withValidation().as(Options.class);
+
+        run(options);
+    }
+
+    /**
+     * Executes the pipeline with the provided execution parameters.
+     *
+     * @param options The execution parameters.
+     */
+    public static PipelineResult run(Options options) {
+        // Create the pipeline.
+        Pipeline pipeline = Pipeline.create(options);
+
+        /*
+         * Steps:
+         *  1) Read from the text source.
+         *  2) Write each text record to Pub/Sub
+         */
+        final List<String> topics = Arrays.asList(
+                "projects/dev-db05-subscriber/topics/jobqueue",
+                "projects/dev-db05-subscriber/topics/jobqueue2"
+        );
+        //final List<String> topics = GehInDatastoreUndHoleDieListeDerTopicsAufDieNachrichtenAnkoimmenSollen();
+
+        final PCollection<String> read_text_data = pipeline
+                .apply(
+                        "Read Text Data",
+                        TextIO.read()
+                                .from(options.getInputFilePattern())
+                                .watchForNewFiles(DEFAULT_POLL_INTERVAL, Watch.Growth.never()));
+
+        for (String topic : topics) {
+            read_text_data.apply("Write to PubSub", PubsubIO.writeStrings().to(topic));
+        }
+
+        return pipeline.run();
+    }
 }

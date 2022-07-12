@@ -92,6 +92,7 @@ public class TextToPubsub {
      *  1) Read from the text source.
      *  2) Write each text record to Pub/Sub
      */
+
     pipeline
         .apply("Read Text Data", TextIO.read().from(options.getInputFilePattern()))
         .apply("Write to PubSub", PubsubIO.writeStrings().to(options.getOutputTopic()));
